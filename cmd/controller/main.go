@@ -19,11 +19,17 @@ package main
 import (
 	"context"
 	"flag"
+	//"fmt"
 	"log"
 	"net/http"
 	"os"
+	//"reflect"
+	//"sync"
+	//"time"
 
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
+	//"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	//"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/customrun"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun"
@@ -39,26 +45,25 @@ import (
 	"knative.dev/pkg/injection/sharedmain"
 	"knative.dev/pkg/signals"
 
+	apispipelinev1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	tektonversionedclientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	//extverinformerfactory "github.com/tektoncd/pipeline/pkg/client/informers/externalversions"
+	//internalinterfaces "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/internalinterfaces"
+	//extverinformerpipeline "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/pipeline"
 	tektonclientinjection "github.com/tektoncd/pipeline/pkg/client/injection/client"
-	//pipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client"
-	//runinformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1alpha1/run"
-	//pipelineruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/pipelinerun"
-	//taskruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun"
-	//pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
-	//taskrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/taskrun"
-	//resolutionrequestreconciler "github.com/tektoncd/pipeline/pkg/client/resolution/injection/reconciler/resolution/v1beta1/resolutionrequest"
-	//runreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1alpha1/run"
-	//resolutionclient "github.com/tektoncd/pipeline/pkg/client/resolution/injection/client"
-	//resolutioninformer "github.com/tektoncd/pipeline/pkg/client/resolution/injection/informers/resolution/v1beta1/resolutionrequest"
-	//resourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource"
-	//limitrangeinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/limitrange"
-	//filteredpodinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/pod/filtered"
-	//customruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/customrun"
-	//customrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/customrun"
+	//informerfactoryinjection "github.com/tektoncd/pipeline/pkg/client/injection/informers/factory"
+	pipelineruninfomerv1injection "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1/pipelinerun"
+	pipelinev1 "github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	//"k8s.io/apimachinery/pkg/runtime/schema"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/klog/v2"
 	kcptripper "github.com/kcp-dev/apimachinery/pkg/client"
+	"k8s.io/klog/v2"
+	kcpsharedinformer "github.com/kcp-dev/apimachinery/third_party/informers"
 )
 
 const (
@@ -132,31 +137,7 @@ func main() {
 	crctrl := customrun.NewController()
 	rctrl := run.NewController()
 
-	//GGM let's insert our new injections before starting the controllers
-	/*
-		kubeclient "knative.dev/pkg/client/injection/kube/client"
-		pipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client"
-		runinformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1alpha1/run"
-		pipelineruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/pipelinerun"
-		taskruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun"
-		pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
-		taskrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/taskrun"
-		resolutionrequestreconciler "github.com/tektoncd/pipeline/pkg/client/resolution/injection/reconciler/resolution/v1beta1/resolutionrequest"
-		runreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1alpha1/run"
-		resolutionclient "github.com/tektoncd/pipeline/pkg/client/resolution/injection/client"
-		resolutioninformer "github.com/tektoncd/pipeline/pkg/client/resolution/injection/informers/resolution/v1beta1/resolutionrequest"
-		resourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource"
-		limitrangeinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/limitrange"
-		filteredpodinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/pod/filtered"
-		customruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/customrun"
-		customrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/customrun"
-
-		injection "knative.dev/pkg/injection"
-	 */
-	/*
-	func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset, error) {
-	something like pkg/client/injection/client/client.go:withClientFromConfig but with a call to NewForConfigAndClient instead of NewForConfigOrDie
-	 */
+	//let's insert our new injections before starting the controllers
 	httpclient, err := ClusterAwareHTTPClient(cfg)
 	if err != nil {
 
@@ -167,15 +148,28 @@ func main() {
 
 	}
 	// start registering injections using allversionclientset as the base.
-	f := func(ctx context.Context, config *rest.Config) context.Context {
+	cf := func(ctx context.Context, config *rest.Config) context.Context {
 		return context.WithValue(ctx, tektonclientinjection.Key{}, allversionclientset)
 	}
-	klog.Infof("GGM main client register context func %#v", f)
-	injection.Default.RegisterClient(f)
+	klog.Infof("GGM main client register context func %#v", cf)
+	injection.Default.RegisterClient(cf)
 
-	//informer injections
+	informerInjector := func(ctx context.Context) (context.Context, controller.Informer) {
+		inf := &prwrapper{client: allversionclientset, resourceVersion: injection.GetResourceVersion(ctx)}
+		klog.Infof("GGM new override informer injection client")
+		return context.WithValue(ctx, pipelineruninfomerv1injection.Key{}, inf), inf.Informer()
+	}
+	klog.Infof("GGM main informer register context func %#v", informerInjector)
+	injection.Default.RegisterInformer(informerInjector)
+	//informerFactoryInjector := func(ctx context.Context) context.Context {
+	//	opts := make([]SharedInformerOption, 0, 1)
+	//	//TODO if want to limit scope to ns, then add that code
+	//	return context.WithValue(ctx, informerfactoryinjection.Key{}, NewSharedInformerFactoryWithOptions(allversionclientset, controller.GetResyncPeriod(ctx), opts...))
+	//}
+	//klog.Infof("GGM main informer factory registry context func %#v", informerFactoryInjector)
+	//injection.Default.RegisterInformerFactory(informerFactoryInjector)
 
-	//TODO in theory now, when these controllers call ...Get(ctx) to get clients
+	//now, when these controllers call ...Get(ctx) to get clients they get our overridden client
 	sharedmain.MainWithConfig(ctx, ControllerLogKey, cfg,
 		trctrl,
 		prctrl,
@@ -189,6 +183,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// kcp / knative override prototype (long term will live somewhere else
+
 // ClusterAwareHTTPClient returns an http.Client with a cluster aware round tripper.
 func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 	httpClient, err := rest.HTTPClientFor(config)
@@ -199,3 +195,214 @@ func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
 	httpClient.Transport = kcptripper.NewClusterRoundTripper(httpClient.Transport)
 	return httpClient, nil
 }
+
+type prwrapper struct {
+	client tektonversionedclientset.Interface
+
+	namespace string
+
+	resourceVersion string
+}
+
+func (w *prwrapper) Informer() cache.SharedIndexInformer {
+	//FYI - the reset of the controllers are still doing v1beta1, but I picked v1 to help distinguish.
+	klog.Infof("GGM prwrapper Informer returning kcp NewSharedIndexInformer with version specific listerwatcher")
+	listerWatcher := &cache.ListWatch{
+		ListFunc:        func(opts metav1.ListOptions) (kruntime.Object, error) {
+			klog.Infof("GGMGGM informer calling our lister")
+			//TODO if want mimic namespace scoping cfg option noted above
+			return w.client.TektonV1().PipelineRuns(metav1.NamespaceAll).List(context.Background(), opts)
+		},
+		WatchFunc:       func(opts metav1.ListOptions) (watch.Interface, error) {
+			klog.Infof("GGMGGM informer calling our watcher")
+			//TODO see above
+			return w.client.TektonV1().PipelineRuns(metav1.NamespaceAll).Watch(context.Background(), opts)
+		},
+	}
+	return kcpsharedinformer.NewSharedIndexInformer(listerWatcher, &apispipelinev1.PipelineRun{}, 0, nil)
+}
+
+func (w *prwrapper) Lister() pipelinev1.PipelineRunLister {
+	return w
+}
+
+func (w *prwrapper) PipelineRuns(namespace string) pipelinev1.PipelineRunNamespaceLister {
+	return &prwrapper{client: w.client, namespace: namespace, resourceVersion: w.resourceVersion}
+}
+
+// SetResourceVersion allows consumers to adjust the minimum resourceVersion
+// used by the underlying client.  It is not accessible via the standard
+// lister interface, but can be accessed through a user-defined interface and
+// an implementation check e.g. rvs, ok := foo.(ResourceVersionSetter)
+func (w *prwrapper) SetResourceVersion(resourceVersion string) {
+	w.resourceVersion = resourceVersion
+}
+
+func (w *prwrapper) List(selector labels.Selector) (ret []*apispipelinev1.PipelineRun, err error) {
+	lo, err := w.client.TektonV1().PipelineRuns(w.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector:   selector.String(),
+		ResourceVersion: w.resourceVersion,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for idx := range lo.Items {
+		ret = append(ret, &lo.Items[idx])
+	}
+	return ret, nil
+}
+
+func (w *prwrapper) Get(name string) (*apispipelinev1.PipelineRun, error) {
+	return w.client.TektonV1().PipelineRuns(w.namespace).Get(context.TODO(), name, metav1.GetOptions{
+		ResourceVersion: w.resourceVersion,
+	})
+}
+
+//type sharedInformerFactory struct {
+//	client           tektonversionedclientset.Interface
+//	namespace        string
+//	tweakListOptions internalinterfaces.TweakListOptionsFunc
+//	lock             sync.Mutex
+//	defaultResync    time.Duration
+//	customResync     map[reflect.Type]time.Duration
+//
+//	informers map[reflect.Type]cache.SharedIndexInformer
+//	// startedInformers is used for tracking which informers have been started.
+//	// This allows Start() to be called multiple times safely.
+//	startedInformers map[reflect.Type]bool
+//}
+//
+//// Start initializes all requested informers.
+//func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+//	f.lock.Lock()
+//	defer f.lock.Unlock()
+//
+//	for informerType, informer := range f.informers {
+//		if !f.startedInformers[informerType] {
+//			go informer.Run(stopCh)
+//			f.startedInformers[informerType] = true
+//		}
+//	}
+//}
+//
+//// WaitForCacheSync waits for all started informers' cache were synced.
+//func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
+//	informers := func() map[reflect.Type]cache.SharedIndexInformer {
+//		f.lock.Lock()
+//		defer f.lock.Unlock()
+//
+//		informers := map[reflect.Type]cache.SharedIndexInformer{}
+//		for informerType, informer := range f.informers {
+//			if f.startedInformers[informerType] {
+//				informers[informerType] = informer
+//			}
+//		}
+//		return informers
+//	}()
+//
+//	res := map[reflect.Type]bool{}
+//	for informType, informer := range informers {
+//		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
+//	}
+//	return res
+//}
+//
+//// InternalInformerFor returns the SharedIndexInformer for obj using an internal
+//// client.
+//func (f *sharedInformerFactory) InformerFor(obj kruntime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
+//	f.lock.Lock()
+//	defer f.lock.Unlock()
+//
+//	informerType := reflect.TypeOf(obj)
+//	informer, exists := f.informers[informerType]
+//	if exists {
+//		return informer
+//	}
+//
+//	resyncPeriod, exists := f.customResync[informerType]
+//	if !exists {
+//		resyncPeriod = f.defaultResync
+//	}
+//
+//	informer = newFunc(f.client, resyncPeriod)
+//	f.informers[informerType] = informer
+//
+//	return informer
+//}
+//
+//func (f *sharedInformerFactory) Tekton() extverinformerpipeline.Interface {
+//	return extverinformerpipeline.New(f, f.namespace, f.tweakListOptions)
+//}
+//
+//// ForResource gives generic access to a shared informer of the matching type
+//// TODO extend this to unknown resources with a client pool
+//func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (extverinformerfactory.GenericInformer, error) {
+//	switch resource {
+//	// Group=tekton.dev, Version=v1
+//	case v1.SchemeGroupVersion.WithResource("pipelines"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1().Pipelines().Informer()}, nil
+//	case v1.SchemeGroupVersion.WithResource("pipelineruns"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1().PipelineRuns().Informer()}, nil
+//	case v1.SchemeGroupVersion.WithResource("tasks"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1().Tasks().Informer()}, nil
+//	case v1.SchemeGroupVersion.WithResource("taskruns"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1().TaskRuns().Informer()}, nil
+//
+//		// Group=tekton.dev, Version=v1alpha1
+//	case v1alpha1.SchemeGroupVersion.WithResource("runs"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1alpha1().Runs().Informer()}, nil
+//
+//		// Group=tekton.dev, Version=v1beta1
+//	case v1beta1.SchemeGroupVersion.WithResource("clustertasks"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1beta1().ClusterTasks().Informer()}, nil
+//	case v1beta1.SchemeGroupVersion.WithResource("customruns"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1beta1().CustomRuns().Informer()}, nil
+//	case v1beta1.SchemeGroupVersion.WithResource("pipelines"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1beta1().Pipelines().Informer()}, nil
+//	case v1beta1.SchemeGroupVersion.WithResource("pipelineruns"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1beta1().PipelineRuns().Informer()}, nil
+//	case v1beta1.SchemeGroupVersion.WithResource("tasks"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1beta1().Tasks().Informer()}, nil
+//	case v1beta1.SchemeGroupVersion.WithResource("taskruns"):
+//		return &genericInformer{resource: resource.GroupResource(), informer: f.Tekton().V1beta1().TaskRuns().Informer()}, nil
+//
+//	}
+//
+//	return nil, fmt.Errorf("no informer found for %v", resource)
+//}
+//
+//type genericInformer struct {
+//	informer cache.SharedIndexInformer
+//	resource schema.GroupResource
+//}
+//
+//// Informer returns the SharedIndexInformer.
+//func (f *genericInformer) Informer() cache.SharedIndexInformer {
+//	return f.informer
+//}
+//
+//// Lister returns the GenericLister.
+//func (f *genericInformer) Lister() cache.GenericLister {
+//	return cache.NewGenericLister(f.Informer().GetIndexer(), f.resource)
+//}
+//
+//type SharedInformerOption func(*sharedInformerFactory) *sharedInformerFactory
+//
+//// NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
+//func NewSharedInformerFactoryWithOptions(client tektonversionedclientset.Interface, defaultResync time.Duration, options ...SharedInformerOption) extverinformerfactory.SharedInformerFactory {
+//	factory := &sharedInformerFactory{
+//		client:           client,
+//		namespace:        metav1.NamespaceAll,
+//		defaultResync:    defaultResync,
+//		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
+//		startedInformers: make(map[reflect.Type]bool),
+//		customResync:     make(map[reflect.Type]time.Duration),
+//	}
+//
+//	// Apply all options
+//	for _, opt := range options {
+//		factory = opt(factory)
+//	}
+//
+//	return factory
+//}
