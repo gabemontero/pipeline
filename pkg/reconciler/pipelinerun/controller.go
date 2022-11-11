@@ -40,6 +40,8 @@ import (
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
+
+	"k8s.io/klog/v2"
 )
 
 // NewController instantiates a new controller.Impl from knative.dev/pkg/controller
@@ -48,6 +50,7 @@ func NewController(opts *pipeline.Options, clock clock.PassiveClock) func(contex
 		logger := logging.FromContext(ctx)
 		kubeclientset := kubeclient.Get(ctx)
 		pipelineclientset := pipelineclient.Get(ctx)
+		klog.Infof("GGM pr ctrl NewController pipelineclientset %#v", pipelineclientset)
 		taskRunInformer := taskruninformer.Get(ctx)
 		runInformer := runinformer.Get(ctx)
 		pipelineRunInformer := pipelineruninformer.Get(ctx)

@@ -20,6 +20,7 @@ package pipelinerun
 
 import (
 	context "context"
+	"k8s.io/klog"
 
 	apispipelinev1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
@@ -51,6 +52,7 @@ func withInformer(ctx context.Context) (context.Context, controller.Informer) {
 
 func withDynamicInformer(ctx context.Context) context.Context {
 	inf := &wrapper{client: client.Get(ctx), resourceVersion: injection.GetResourceVersion(ctx)}
+	klog.Infof("GGM v1 dynamic informer injection client obtained: %#v", inf.client)
 	return context.WithValue(ctx, Key{}, inf)
 }
 
