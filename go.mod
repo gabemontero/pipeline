@@ -43,6 +43,8 @@ require (
 	code.gitea.io/sdk/gitea v0.15.1
 	github.com/goccy/kpoward v0.1.0
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20221030203717-1711cefd7eec
+	github.com/kcp-dev/apimachinery v0.0.0-20220922165458-607ac5e87531
+	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.3
 	github.com/letsencrypt/boulder v0.0.0-20220929215747-76583552c2be
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399
 	k8s.io/utils v0.0.0-20221012122500-cfd413dd9e85
@@ -181,7 +183,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apiextensions-apiserver v0.25.2 // indirect
 	k8s.io/gengo v0.0.0-20220613173612-397b4ae3bce7 // indirect
-	k8s.io/klog/v2 v2.80.1 // indirect
+	k8s.io/klog/v2 v2.80.1
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
