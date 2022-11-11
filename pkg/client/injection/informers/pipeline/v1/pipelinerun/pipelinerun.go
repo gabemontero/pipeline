@@ -45,6 +45,7 @@ func init() {
 type Key struct{}
 
 func withInformer(ctx context.Context) (context.Context, controller.Informer) {
+	klog.Infof("GGM v1 non-dynamic informer injection called - TODO override factory as well to create cluster aware informers??")
 	f := factory.Get(ctx)
 	inf := f.Tekton().V1().PipelineRuns()
 	return context.WithValue(ctx, Key{}, inf), inf.Informer()
