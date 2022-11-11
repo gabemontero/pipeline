@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
@@ -37,6 +38,27 @@ import (
 	"knative.dev/pkg/injection"
 	"knative.dev/pkg/injection/sharedmain"
 	"knative.dev/pkg/signals"
+
+	tektonversionedclientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	tektonclientinjection "github.com/tektoncd/pipeline/pkg/client/injection/client"
+	//pipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client"
+	//runinformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1alpha1/run"
+	//pipelineruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/pipelinerun"
+	//taskruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun"
+	//pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
+	//taskrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/taskrun"
+	//resolutionrequestreconciler "github.com/tektoncd/pipeline/pkg/client/resolution/injection/reconciler/resolution/v1beta1/resolutionrequest"
+	//runreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1alpha1/run"
+	//resolutionclient "github.com/tektoncd/pipeline/pkg/client/resolution/injection/client"
+	//resolutioninformer "github.com/tektoncd/pipeline/pkg/client/resolution/injection/informers/resolution/v1beta1/resolutionrequest"
+	//resourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource"
+	//limitrangeinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/limitrange"
+	//filteredpodinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/pod/filtered"
+	//customruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/customrun"
+	//customrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/customrun"
+
+	"k8s.io/klog/v2"
+	kcptripper "github.com/kcp-dev/apimachinery/pkg/client"
 )
 
 const (
@@ -104,15 +126,76 @@ func main() {
 	}()
 
 	ctx = filteredinformerfactory.WithSelectors(ctx, v1beta1.ManagedByLabelKey)
+	trctrl := taskrun.NewController(opts, clock.RealClock{})
+	prctrl := pipelinerun.NewController(opts, clock.RealClock{})
+	rrctrl := resolutionrequest.NewController(clock.RealClock{})
+	crctrl := customrun.NewController()
+	rctrl := run.NewController()
+
+	//GGM let's insert our new injections before starting the controllers
+	/*
+		kubeclient "knative.dev/pkg/client/injection/kube/client"
+		pipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client"
+		runinformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1alpha1/run"
+		pipelineruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/pipelinerun"
+		taskruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun"
+		pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
+		taskrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/taskrun"
+		resolutionrequestreconciler "github.com/tektoncd/pipeline/pkg/client/resolution/injection/reconciler/resolution/v1beta1/resolutionrequest"
+		runreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1alpha1/run"
+		resolutionclient "github.com/tektoncd/pipeline/pkg/client/resolution/injection/client"
+		resolutioninformer "github.com/tektoncd/pipeline/pkg/client/resolution/injection/informers/resolution/v1beta1/resolutionrequest"
+		resourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource"
+		limitrangeinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/limitrange"
+		filteredpodinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/pod/filtered"
+		customruninformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/customrun"
+		customrunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/customrun"
+
+		injection "knative.dev/pkg/injection"
+	 */
+	/*
+	func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset, error) {
+	something like pkg/client/injection/client/client.go:withClientFromConfig but with a call to NewForConfigAndClient instead of NewForConfigOrDie
+	 */
+	httpclient, err := ClusterAwareHTTPClient(cfg)
+	if err != nil {
+
+	}
+	allversionclientset, err2 := tektonversionedclientset.NewForConfigAndClient(cfg, httpclient)
+	klog.Infof("GGM new client %#v", allversionclientset)
+	if err2 != nil {
+
+	}
+	// start registering injections using allversionclientset as the base.
+	f := func(ctx context.Context, config *rest.Config) context.Context {
+		return context.WithValue(ctx, tektonclientinjection.Key{}, allversionclientset)
+	}
+	klog.Infof("GGM main client register context func %#v", f)
+	injection.Default.RegisterClient(f)
+
+	//informer injections
+
+	//TODO in theory now, when these controllers call ...Get(ctx) to get clients
 	sharedmain.MainWithConfig(ctx, ControllerLogKey, cfg,
-		taskrun.NewController(opts, clock.RealClock{}),
-		pipelinerun.NewController(opts, clock.RealClock{}),
-		run.NewController(),
-		resolutionrequest.NewController(clock.RealClock{}),
-		customrun.NewController(),
+		trctrl,
+		prctrl,
+		rctrl,
+		rrctrl,
+		crctrl,
 	)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+}
+
+// ClusterAwareHTTPClient returns an http.Client with a cluster aware round tripper.
+func ClusterAwareHTTPClient(config *rest.Config) (*http.Client, error) {
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	httpClient.Transport = kcptripper.NewClusterRoundTripper(httpClient.Transport)
+	return httpClient, nil
 }
