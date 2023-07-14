@@ -28,6 +28,7 @@ import (
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/resolution/common"
 	"github.com/tektoncd/pipeline/pkg/resolution/resolver/framework"
+	"knative.dev/pkg/configmap"
 )
 
 const (
@@ -65,6 +66,11 @@ func (r *Resolver) GetName(context.Context) string {
 // GetConfigName returns the name of the bundle resolver's configmap.
 func (r *Resolver) GetConfigName(context.Context) string {
 	return "hubresolver-config"
+}
+
+// StartupInitialization allows for a resolver to perform operations from the configuration on startup
+func (r *Resolver) StartupInitialization(_ context.Context, _ configmap.Watcher) error {
+	return nil
 }
 
 // GetSelector returns a map of labels to match requests to this resolver.

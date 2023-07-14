@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/client-go/kubernetes"
 	kubeclient "knative.dev/pkg/client/injection/kube/client"
+	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/logging"
 )
 
@@ -274,6 +275,11 @@ var _ framework.ConfigWatcher = &Resolver{}
 // GetConfigName returns the name of the git resolver's configmap.
 func (r *Resolver) GetConfigName(context.Context) string {
 	return ConfigMapName
+}
+
+// StartupInitialization allows for a resolver to perform operations from the configuration on startup
+func (r *Resolver) StartupInitialization(_ context.Context, _ configmap.Watcher) error {
+	return nil
 }
 
 var _ framework.TimedResolution = &Resolver{}

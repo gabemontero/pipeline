@@ -21,6 +21,7 @@ import (
 	"time"
 
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"knative.dev/pkg/configmap"
 )
 
 // Resolver is the interface to implement for type-specific resource
@@ -67,6 +68,10 @@ type ConfigWatcher interface {
 	// configuration to be referenced by. This will map to the name
 	// of a ConfigMap in the same namespace as the resolver.
 	GetConfigName(context.Context) string
+
+	// StartupInitialization allows for a resolver to perform operations from the configuration on startup,
+	// as opposed to accessing the configuration as part of processing a resolution request
+	StartupInitialization(context.Context, configmap.Watcher) error
 }
 
 // TimedResolution is an optional interface that a resolver can

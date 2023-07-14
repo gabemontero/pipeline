@@ -19,8 +19,6 @@ package framework
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/tektoncd/pipeline/pkg/apis/resolution/v1beta1"
 	rrclient "github.com/tektoncd/pipeline/pkg/client/resolution/injection/client"
 	rrinformer "github.com/tektoncd/pipeline/pkg/client/resolution/injection/informers/resolution/v1beta1/resolutionrequest"
@@ -35,6 +33,7 @@ import (
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/reconciler"
+	"strings"
 )
 
 // ReconcilerModifier is a func that can access and modify a reconciler
@@ -93,6 +92,20 @@ func NewController(ctx context.Context, resolver Resolver, modifiers ...Reconcil
 				// DeleteFunc: impl.Enqueue,
 			},
 		})
+		if r.configStore != nil {
+			if configWatcher, ok := r.resolver.(ConfigWatcher); ok {
+				go func() {
+					if !cache.WaitForCacheSync(ctx.Done(), rrInformer.Informer().HasSynced) {
+						logging.FromContext(ctx).Warnf("WaitForCacheSync during StartupInitialization processing did not complete in time for %s", resolver.GetName(ctx))
+						return
+					}
+					ctx = r.configStore.ToContext(ctx)
+					configWatcher.StartupInitialization(ctx, cmw)
+
+				}()
+
+			}
+		}
 
 		return impl
 	}

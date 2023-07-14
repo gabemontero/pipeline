@@ -113,6 +113,7 @@ func GetTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset
 		kind = tr.Kind
 	}
 
+	//GGM switch for old vs. new bundle resolution for tasks
 	switch {
 	case cfg.FeatureFlags.EnableTektonOCIBundles && tr != nil && tr.Bundle != "":
 		// Return an inline function that implements GetTask by calling Resolver.Get with the specified task type and
@@ -148,7 +149,8 @@ func GetTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset
 				replacedParams = append(replacedParams, tr.Params...)
 			}
 			resolver := resolution.NewResolver(requester, owner, string(tr.Resolver), trName, namespace, replacedParams)
-			return resolveTask(ctx, resolver, name, kind, k8s)
+			task, refSource, err := resolveTask(ctx, resolver, name, kind, k8s)
+			return task, refSource, err
 		}
 
 	default:
@@ -166,6 +168,7 @@ func GetTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset
 // fetch a task with given name. An error is returned if the
 // remoteresource doesn't work or the returned data isn't a valid
 // *v1beta1.Task.
+// GGM convert bundle runtime obj to task
 func resolveTask(ctx context.Context, resolver remote.Resolver, name string, kind v1beta1.TaskKind, k8s kubernetes.Interface) (*v1beta1.Task, *v1beta1.RefSource, error) {
 	// Because the resolver will only return references with the same kind (eg ClusterTask), this will ensure we
 	// don't accidentally return a Task with the same name but different kind.

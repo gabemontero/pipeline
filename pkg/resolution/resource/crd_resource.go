@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/apis/resolution/v1beta1"
 	rrclient "github.com/tektoncd/pipeline/pkg/client/resolution/clientset/versioned"
@@ -52,6 +51,7 @@ var _ Requester = &CRDRequester{}
 // Submit constructs a ResolutionRequest object and submits it to the
 // kubernetes cluster, returning any errors experienced while doing so.
 // If ResolutionRequest is succeeded then it returns the resolved data.
+// GGM fetch or build ResolutionRequest CR instances
 func (r *CRDRequester) Submit(ctx context.Context, resolver ResolverName, req Request) (ResolvedResource, error) {
 	rr, _ := r.lister.ResolutionRequests(req.Namespace()).Get(req.Name())
 	if rr == nil {

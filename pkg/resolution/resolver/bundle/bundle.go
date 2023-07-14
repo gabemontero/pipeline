@@ -19,12 +19,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"knative.dev/pkg/logging"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/resolution/resolver/framework"
@@ -53,6 +56,13 @@ type ResolvedResource struct {
 
 var _ framework.ResolvedResource = &ResolvedResource{}
 
+var imgCache *lru.Cache
+
+func init() {
+	// as long as size is above 0 we will not get an error
+	imgCache, _ = lru.New(1024)
+}
+
 // Data returns the bytes of the resource fetched from the bundle.
 func (br *ResolvedResource) Data() []byte {
 	return br.data
@@ -68,6 +78,25 @@ func (br *ResolvedResource) Annotations() map[string]string {
 // file came from including the url, digest and the entrypoint.
 func (br *ResolvedResource) RefSource() *pipelinev1beta1.RefSource {
 	return br.source
+}
+
+func getImageCacheKey(bundleName string) (string, error) {
+	imgRef, err := name.ParseReference(bundleName)
+	if err != nil {
+		return "", err
+	}
+	digest, dok := imgRef.(name.Digest)
+	tag, tok := imgRef.(name.Tag)
+
+	key := ""
+
+	switch {
+	case dok:
+		key = digest.String()
+	case tok:
+		key = tag.String()
+	}
+	return key, nil
 }
 
 // GetEntry accepts a keychain and options for the request and returns
@@ -116,7 +145,7 @@ func GetEntry(ctx context.Context, keychain authn.Keychain, opts RequestOptions)
 				// This could still be a raw layer so try to read it as that instead.
 				obj, _ = readRawLayer(layers[idx])
 			}
-			return &ResolvedResource{
+			rr := &ResolvedResource{
 				data: obj,
 				annotations: map[string]string{
 					ResolverAnnotationKind:       lKind,
@@ -130,7 +159,38 @@ func GetEntry(ctx context.Context, keychain authn.Keychain, opts RequestOptions)
 					},
 					EntryPoint: opts.EntryName,
 				},
-			}, nil
+			}
+			key := ""
+			key, err = getImageCacheKey(opts.Bundle)
+			if err != nil {
+				return nil, err
+			}
+
+			cm := framework.GetResolverConfigFromContext(ctx)
+			storeOnRequest := false
+			enabledStr, eok := cm[StartupCacheLoadOnRequest]
+			if eok {
+				f, err := strconv.ParseBool(enabledStr)
+				if err == nil {
+					storeOnRequest = f
+				}
+			}
+			if storeOnRequest {
+				logging.FromContext(ctx).Infof("GetEntry based on request adding cache entry for kind %s entryname %s key %s", opts.Kind, opts.EntryName, key)
+				imgCache.Add(key, rr)
+
+			} else {
+				for k, v := range cm {
+					if !strings.HasPrefix(k, StartupPreloadPrefix) || strings.HasSuffix(k, StartupPreloadEntryNameSuffix) || strings.HasSuffix(k, StartupPreloadKindSuffix) {
+						continue
+					}
+					if strings.TrimSpace(v) == strings.TrimSpace(key) {
+						logging.FromContext(ctx).Infof("GetEntry adding configured cache entry for kind %s entryname %s key %s", opts.Kind, opts.EntryName, key)
+						imgCache.Add(key, rr)
+					}
+				}
+			}
+			return rr, nil
 		}
 	}
 	return nil, fmt.Errorf("could not find object in image with kind: %s and name: %s", opts.Kind, opts.EntryName)

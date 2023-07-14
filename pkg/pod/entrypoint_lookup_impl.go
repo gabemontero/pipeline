@@ -42,6 +42,9 @@ type entrypointCache struct {
 // NewEntrypointCache returns a new entrypoint cache implementation that uses
 // K8s credentials to pull image metadata from a container image registry.
 func NewEntrypointCache(kubeclient kubernetes.Interface) (EntrypointCache, error) {
+	//GGM can we resuse the entrypoint cache used for taskrun images for the task from remote bundles images ?
+	//GGM do we need to make the interface's get method public?  why was it made private?
+
 	lru, err := lru.New(cacheSize)
 	if err != nil {
 		return nil, err

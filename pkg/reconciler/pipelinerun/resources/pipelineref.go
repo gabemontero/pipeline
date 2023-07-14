@@ -63,6 +63,7 @@ func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clien
 		}
 	}
 
+	//GGM switch for old vs. new bundle resolution for pipelines
 	switch {
 	case cfg.FeatureFlags.EnableTektonOCIBundles && pr != nil && pr.Bundle != "":
 		// Return an inline function that implements GetTask by calling Resolver.Get with the specified task type and
@@ -152,6 +153,7 @@ func (l *LocalPipelineRefResolver) GetPipeline(ctx context.Context, name string)
 // fetch a pipeline with given name. An error is returned if the
 // resolution doesn't work or the returned data isn't a valid
 // *v1beta1.Pipeline.
+// GGM convert bundle runtime obj to pipeline
 func resolvePipeline(ctx context.Context, resolver remote.Resolver, name string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
 	obj, refSource, err := resolver.Get(ctx, "pipeline", name)
 	if err != nil {

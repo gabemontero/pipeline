@@ -51,6 +51,8 @@ type imageData struct {
 // Images that are not specified by digest will be specified by digest after
 // lookup in the resulting list of containers.
 func resolveEntrypoints(ctx context.Context, cache EntrypointCache, namespace, serviceAccountName string, imagePullSecrets []corev1.LocalObjectReference, steps []corev1.Container) ([]corev1.Container, error) {
+	//GGM so there is some local caching, but only for the array of steps/containers
+
 	// Keep a local cache of name->imageData lookups, just for the scope of
 	// resolving this set of steps. If the image is pushed to before the
 	// next run, we need to resolve its digest and commands again, but we

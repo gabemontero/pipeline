@@ -18,7 +18,6 @@ package framework
 
 import (
 	"context"
-
 	resolverconfig "github.com/tektoncd/pipeline/pkg/apis/config/resolver"
 	corev1 "k8s.io/api/core/v1"
 	"knative.dev/pkg/configmap"
@@ -75,6 +74,7 @@ func (store *ConfigStore) WatchConfigs(w configmap.Watcher) {
 
 // GetResolverConfig returns a copy of the resolver's current
 // configuration or an empty map if the stored config is nil or invalid.
+// GGM access to resolver config map without context ... perhaps OK for startup read
 func (store *ConfigStore) GetResolverConfig() map[string]string {
 	resolverConfig := map[string]string{}
 	untypedConf := store.untyped.UntypedLoad(store.resolverConfigName)
@@ -101,6 +101,7 @@ func InjectResolverConfigToContext(ctx context.Context, conf map[string]string) 
 
 // GetResolverConfigFromContext returns any resolver-specific
 // configuration that has been stored or an empty map if none exists.
+// GGM getting config from the resolver config map for injection based access
 func GetResolverConfigFromContext(ctx context.Context) map[string]string {
 	conf := map[string]string{}
 	storedConfig := ctx.Value(resolverConfigKey)

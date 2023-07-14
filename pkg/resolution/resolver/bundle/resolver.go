@@ -19,15 +19,21 @@ package bundle
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/authn/k8schain"
 	resolverconfig "github.com/tektoncd/pipeline/pkg/apis/config/resolver"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/resolution/common"
 	"github.com/tektoncd/pipeline/pkg/resolution/resolver/framework"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"knative.dev/pkg/client/injection/kube/client"
+	"knative.dev/pkg/configmap"
+	"knative.dev/pkg/configmap/informer"
+	"knative.dev/pkg/logging"
 )
 
 const (
@@ -66,6 +72,62 @@ func (r *Resolver) GetConfigName(context.Context) string {
 	return ConfigMapName
 }
 
+// StartupInitialization allows for a resolver to perform operations from the configuration on startup
+func (r *Resolver) StartupInitialization(ctx context.Context, cmw configmap.Watcher) error {
+	if informerWatcher, ok := cmw.(*informer.InformedWatcher); ok {
+		informerWatcher.Watch(ConfigMapName, func(configMap *corev1.ConfigMap) {
+			ctx = framework.InjectResolverConfigToContext(ctx, configMap.Data)
+			r.populateCache(ctx)
+		})
+	}
+	return r.populateCache(ctx)
+}
+
+func (r *Resolver) populateCache(ctx context.Context) error {
+	imgCache.Purge()
+	config := framework.GetResolverConfigFromContext(ctx)
+	var e error
+	sa, _ := config[StartupPreloadServiceAccount]
+	ns, _ := config[StartupPreloadServiceAccountNamespace]
+	for key, image := range config {
+		if strings.HasPrefix(key, StartupPreloadPrefix) {
+			if len(image) == 0 {
+				continue
+			}
+			kind, kok := config[key+StartupPreloadKindSuffix]
+			if !kok {
+				continue
+			}
+			entryName, eok := config[key+StartupPreloadEntryNameSuffix]
+			if !eok {
+				continue
+			}
+			kc, _ := k8schain.New(ctx, r.kubeClientSet, k8schain.Options{
+				Namespace:          ns,
+				ServiceAccountName: sa,
+			})
+			opts := RequestOptions{
+				Bundle:    image,
+				Kind:      kind,
+				EntryName: entryName,
+			}
+			err := getEntry(ctx, kc, opts)
+			if err != nil {
+				e = err
+				logging.FromContext(ctx).Infof("cache preload for %s got error: %s", image, err.Error())
+			}
+		}
+	}
+	return e
+}
+
+func getEntry(ctx context.Context, kc authn.Keychain, opts RequestOptions) error {
+	c, cancelFunc := context.WithTimeout(ctx, timeoutDuration)
+	defer cancelFunc()
+	_, err := GetEntry(c, kc, opts)
+	return err
+}
+
 // GetSelector returns a map of labels to match requests to this Resolver.
 func (r *Resolver) GetSelector(context.Context) map[string]string {
 	return map[string]string{
@@ -94,6 +156,21 @@ func (r *Resolver) Resolve(ctx context.Context, params []pipelinev1beta1.Param) 
 		return nil, err
 	}
 	namespace := common.RequestNamespace(ctx)
+	// down in the knative dependencies, a non-caching client direct hit to the api server i.e. no caching client; so, we do thecache lookup
+	// here vs. down in GetEntry
+	key := ""
+	key, err = getImageCacheKey(opts.Bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	if rr, ok := imgCache.Get(key); ok {
+		logging.FromContext(ctx).Infof("Bundle.Resolve found cache entry for: %s", key)
+		return rr.(*ResolvedResource), nil
+	} else {
+		logging.FromContext(ctx).Infof("Bundle.Resolve no cache entry for: %s", key)
+	}
+
 	kc, _ := k8schain.New(ctx, r.kubeClientSet, k8schain.Options{
 		Namespace:          namespace,
 		ServiceAccountName: opts.ServiceAccount,

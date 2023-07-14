@@ -31,6 +31,7 @@ import (
 	resolutioncommon "github.com/tektoncd/pipeline/pkg/resolution/common"
 	"github.com/tektoncd/pipeline/pkg/resolution/resolver/framework"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/yaml"
 )
@@ -167,6 +168,11 @@ var _ framework.ConfigWatcher = &Resolver{}
 // GetConfigName returns the name of the cluster resolver's configmap.
 func (r *Resolver) GetConfigName(context.Context) string {
 	return configMapName
+}
+
+// StartupInitialization allows for a resolver to perform operations from the configuration on startup
+func (r *Resolver) StartupInitialization(_ context.Context, _ configmap.Watcher) error {
+	return nil
 }
 
 func (r *Resolver) isDisabled(ctx context.Context) bool {
