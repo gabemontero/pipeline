@@ -72,7 +72,7 @@ func TestUninitializedMetrics(t *testing.T) {
 	if err := metrics.DurationAndCount(ctx, &v1.TaskRun{}, beforeCondition); err == nil {
 		t.Error("DurationCount recording expected to return error but got nil")
 	}
-	if err := metrics.RunningTaskRuns(ctx, nil); err == nil {
+	if err := metrics.RunningTaskRuns(ctx, nil, nil); err == nil {
 		t.Error("Current TaskRunsCount recording expected to return error but got nil")
 	}
 	if err := metrics.RecordPodLatency(ctx, nil, nil); err == nil {
@@ -511,7 +511,7 @@ func TestRecordRunningTaskRunsCount(t *testing.T) {
 		t.Fatalf("NewRecorder: %v", err)
 	}
 
-	if err := metrics.RunningTaskRuns(ctx, informer.Lister()); err != nil {
+	if err := metrics.RunningTaskRuns(ctx, nil, informer.Lister()); err != nil {
 		t.Errorf("RunningTaskRuns: %v", err)
 	}
 	metricstest.CheckLastValueData(t, "running_taskruns_count", map[string]string{}, 1)
@@ -592,7 +592,7 @@ func TestRecordRunningTaskRunsThrottledCounts(t *testing.T) {
 		unregisterMetrics()
 		ctx, _ := ttesting.SetupFakeContext(t)
 		informer := faketaskruninformer.Get(ctx)
-		for range multiplier {
+		for i := 0; i < multiplier; i++ {
 			tr := &v1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{Name: names.SimpleNameGenerator.RestrictLengthWithRandomSuffix("taskrun-"), Namespace: "test"},
 				Status: v1.TaskRunStatus{
@@ -616,7 +616,7 @@ func TestRecordRunningTaskRunsThrottledCounts(t *testing.T) {
 			t.Fatalf("NewRecorder: %v", err)
 		}
 
-		if err := metrics.RunningTaskRuns(ctx, informer.Lister()); err != nil {
+		if err := metrics.RunningTaskRuns(ctx, nil, informer.Lister()); err != nil {
 			t.Errorf("RunningTaskRuns: %v", err)
 		}
 		metricstest.CheckLastValueData(t, "running_taskruns_throttled_by_quota_count", map[string]string{}, tc.quotaCount)

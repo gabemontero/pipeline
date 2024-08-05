@@ -18,9 +18,10 @@ package config
 
 import (
 	"context"
-
 	sc "github.com/tektoncd/pipeline/pkg/spire/config"
 	"knative.dev/pkg/configmap"
+	"knative.dev/pkg/logging"
+	"runtime"
 )
 
 type cfgKey struct{}
@@ -48,7 +49,15 @@ func FromContext(ctx context.Context) *Config {
 // FromContextOrDefaults is like FromContext, but when no Config is attached it
 // returns a Config populated with the defaults for each of the Config fields.
 func FromContextOrDefaults(ctx context.Context) *Config {
+	logger := logging.FromContext(ctx)
 	if cfg := FromContext(ctx); cfg != nil {
+		if logger != nil && cfg.Metrics != nil {
+			buf := make([]byte, 3000)
+			runtime.Stack(buf, false)
+			str := string(buf)
+			logger.Infof("GGM4 config FromContextOrDefaults pulled this add ns cfg from %v", cfg.Metrics.ThrottleWithNamespace)
+			logger.Infof("%s\n", str)
+		}
 		return cfg
 	}
 
@@ -72,11 +81,13 @@ func ToContext(ctx context.Context, c *Config) context.Context {
 // +k8s:deepcopy-gen=false
 type Store struct {
 	*configmap.UntypedStore
+	logger configmap.Logger
 }
 
 // NewStore creates a new store of Configs and optionally calls functions when ConfigMaps are updated.
 func NewStore(logger configmap.Logger, onAfterStore ...func(name string, value interface{})) *Store {
 	store := &Store{
+		logger: logger,
 		UntypedStore: configmap.NewUntypedStore(
 			"defaults/features/artifacts",
 			logger,
@@ -97,7 +108,9 @@ func NewStore(logger configmap.Logger, onAfterStore ...func(name string, value i
 
 // ToContext attaches the current Config state to the provided context.
 func (s *Store) ToContext(ctx context.Context) context.Context {
-	return ToContext(ctx, s.Load())
+	cfg := s.Load()
+	s.logger.Infof("GGM3 Store to context storing metrics ns cfg added to ctx %v", cfg.Metrics.ThrottleWithNamespace)
+	return ToContext(ctx, cfg)
 }
 
 // Load creates a Config from the current config state of the Store.
@@ -114,6 +127,7 @@ func (s *Store) Load() *Config {
 	if metrics == nil {
 		metrics = DefaultMetrics.DeepCopy()
 	}
+	s.logger.Infof("GGMGGM Store Load metrics %#v", metrics)
 	tracing := s.UntypedLoad(GetTracingConfigName())
 	if tracing == nil {
 		tracing = DefaultTracing.DeepCopy()

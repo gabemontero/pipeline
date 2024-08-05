@@ -17,8 +17,10 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	"knative.dev/pkg/metrics"
+	"os"
 )
 
 const (
@@ -127,6 +129,7 @@ func (cfg *Metrics) Equals(other *Metrics) bool {
 
 // newMetricsFromMap returns a Config given a map corresponding to a ConfigMap
 func newMetricsFromMap(cfgMap map[string]string) (*Metrics, error) {
+	fmt.Fprintf(os.Stdout, "GGMGGM newMetricsFromMap cfgMap %#v\n", cfgMap)
 	tc := Metrics{
 		TaskrunLevel:            DefaultTaskrunLevel,
 		PipelinerunLevel:        DefaultPipelinerunLevel,
@@ -154,6 +157,8 @@ func newMetricsFromMap(cfgMap map[string]string) (*Metrics, error) {
 		tc.CountWithReason = true
 	}
 
+	th, o := cfgMap[throttledWithNamespaceKey]
+	fmt.Fprintf(os.Stdout, "GGMGGM newMetricsFromMap key there %v value %s", o, th)
 	if throttleWithNamespace, ok := cfgMap[throttledWithNamespaceKey]; ok && throttleWithNamespace != "false" {
 		tc.ThrottleWithNamespace = true
 	}

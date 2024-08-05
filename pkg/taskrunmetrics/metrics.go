@@ -122,6 +122,8 @@ type Recorder struct {
 	mutex       sync.Mutex
 	initialized bool
 
+	store *config.Store
+
 	ReportingPeriod time.Duration
 
 	insertTaskTag func(task,
@@ -151,7 +153,18 @@ func NewRecorder(ctx context.Context) (*Recorder, error) {
 			ReportingPeriod: 30 * time.Second,
 		}
 
+		r.store = config.NewStore(logging.FromContext(ctx).Named("config-store"))
+
 		cfg := config.FromContextOrDefaults(ctx)
+		logger := logging.FromContext(ctx)
+		if logger != nil {
+			if cfg.Metrics != nil {
+				logger.Infof("GGM1 NewRecorder config metrics %#v", cfg.Metrics)
+			} else {
+				logger.Infof("GGM2 NewRecorder config metrics nil")
+			}
+
+		}
 
 		errRegistering = viewRegister(cfg.Metrics)
 		if errRegistering != nil {
@@ -441,7 +454,7 @@ func (r *Recorder) DurationAndCount(ctx context.Context, tr *v1.TaskRun, beforeC
 
 // RunningTaskRuns logs the number of TaskRuns running right now
 // returns an error if its failed to log the metrics
-func (r *Recorder) RunningTaskRuns(ctx context.Context, lister listers.TaskRunLister) error {
+func (r *Recorder) RunningTaskRuns(ctx context.Context, logger *zap.SugaredLogger, lister listers.TaskRunLister) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -454,8 +467,18 @@ func (r *Recorder) RunningTaskRuns(ctx context.Context, lister listers.TaskRunLi
 		return err
 	}
 
-	cfg := config.FromContextOrDefaults(ctx)
-	addNamespaceLabelToQuotaThrottleMetric := cfg.Metrics != nil && cfg.Metrics.ThrottleWithNamespace
+	// the polling context is not seeded with the config package context
+	cfg1 := config.FromContextOrDefaults(ctx)
+	cfg2 := r.store.Load()
+	if cfg1 != nil && logger != nil {
+		if cfg1.Metrics != nil {
+			logger.Infof("GGM0 throttle with namespace %v", cfg2.Metrics.ThrottleWithNamespace)
+		}
+		if cfg2 != nil && logger != nil {
+			logger.Infof("GGM0 throttle with namespace backup %v", cfg2.Metrics.ThrottleWithNamespace)
+		}
+	}
+	addNamespaceLabelToQuotaThrottleMetric := (cfg1.Metrics != nil && cfg1.Metrics.ThrottleWithNamespace) || (cfg2.Metrics != nil && cfg2.Metrics.ThrottleWithNamespace)
 
 	var runningTrs int
 	trsThrottledByQuota := map[string]int{}
@@ -498,6 +521,10 @@ func (r *Recorder) RunningTaskRuns(ctx context.Context, lister listers.TaskRunLi
 		}
 	}
 
+	if logger != nil {
+		logger.Infof("GGM trsThrottledByQuotaCount %d trsThrottledByQuota map %#v", trsThrottledByQuotaCount, trsThrottledByQuota)
+	}
+
 	ctx, err = tag.New(ctx)
 	if err != nil {
 		return err
@@ -509,18 +536,27 @@ func (r *Recorder) RunningTaskRuns(ctx context.Context, lister listers.TaskRunLi
 	metrics.Record(ctx, runningTRsThrottledByNodeCount.M(float64(trsThrottledByNodeCount)))
 
 	for ns, cnt := range trsThrottledByQuota {
+		if logger != nil {
+			logger.Infof("GGM trsThrottledByQuota processig ns %s with count %d ns enabled %v", ns, cnt, addNamespaceLabelToQuotaThrottleMetric)
+		}
 		var mutators []tag.Mutator
 		if addNamespaceLabelToQuotaThrottleMetric {
 			mutators = []tag.Mutator{tag.Insert(namespaceTag, ns)}
 		}
-		ctx, err := tag.New(ctx, mutators...)
+		ctx, err = tag.New(ctx, mutators...)
 		if err != nil {
+			if logger != nil {
+				logger.Infof("GGM tag.New error %s", err.Error())
+			}
 			return err
 		}
 		metrics.Record(ctx, runningTRsThrottledByQuota.M(float64(cnt)))
 	}
 	for ns, cnt := range trsThrottledByNode {
-		ctx, err := tag.New(ctx, []tag.Mutator{tag.Insert(namespaceTag, ns)}...)
+		if logger != nil {
+			logger.Infof("GGM trsThrottledByNode processig ns %s with count %d", ns, cnt)
+		}
+		ctx, err = tag.New(ctx, []tag.Mutator{tag.Insert(namespaceTag, ns)}...)
 		if err != nil {
 			return err
 		}
@@ -546,7 +582,7 @@ func (r *Recorder) ReportRunningTaskRuns(ctx context.Context, lister listers.Tas
 		case <-delay.C:
 			// Every 30s surface a metric for the number of running tasks, as well as those running tasks that are currently throttled by k8s,
 			// and those running tasks waiting on task reference resolution
-			if err := r.RunningTaskRuns(ctx, lister); err != nil {
+			if err := r.RunningTaskRuns(ctx, logger, lister); err != nil {
 				logger.Warnf("Failed to log the metrics : %v", err)
 			}
 		}
