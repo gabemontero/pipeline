@@ -469,16 +469,13 @@ func (r *Recorder) RunningTaskRuns(ctx context.Context, logger *zap.SugaredLogge
 
 	// the polling context is not seeded with the config package context
 	cfg1 := config.FromContextOrDefaults(ctx)
-	cfg2 := r.store.Load()
 	if cfg1 != nil && logger != nil {
 		if cfg1.Metrics != nil {
-			logger.Infof("GGM0 throttle with namespace %v", cfg2.Metrics.ThrottleWithNamespace)
-		}
-		if cfg2 != nil && logger != nil {
-			logger.Infof("GGM0 throttle with namespace backup %v", cfg2.Metrics.ThrottleWithNamespace)
+			logger.Infof("GGM0 throttle with namespace %v", cfg1.Metrics.ThrottleWithNamespace)
 		}
 	}
-	addNamespaceLabelToQuotaThrottleMetric := (cfg1.Metrics != nil && cfg1.Metrics.ThrottleWithNamespace) || (cfg2.Metrics != nil && cfg2.Metrics.ThrottleWithNamespace)
+
+	addNamespaceLabelToQuotaThrottleMetric := cfg1.Metrics != nil && cfg1.Metrics.ThrottleWithNamespace
 
 	var runningTrs int
 	trsThrottledByQuota := map[string]int{}

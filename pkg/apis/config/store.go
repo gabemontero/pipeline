@@ -18,6 +18,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	sc "github.com/tektoncd/pipeline/pkg/spire/config"
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/logging"
@@ -51,14 +52,19 @@ func FromContext(ctx context.Context) *Config {
 func FromContextOrDefaults(ctx context.Context) *Config {
 	logger := logging.FromContext(ctx)
 	if cfg := FromContext(ctx); cfg != nil {
-		if logger != nil && cfg.Metrics != nil {
-			buf := make([]byte, 3000)
-			runtime.Stack(buf, false)
-			str := string(buf)
-			logger.Infof("GGM4 config FromContextOrDefaults pulled this add ns cfg from %v", cfg.Metrics.ThrottleWithNamespace)
-			logger.Infof("%s\n", str)
+		if logger != nil && cfg.Metrics != nil && !cfg.Metrics.ThrottleWithNamespace {
+			logger.Infof("GGM4 config FromContextOrDefaults found config but throttle false")
 		}
 		return cfg
+	}
+
+	if logger != nil {
+		buf := make([]byte, 500)
+		runtime.Stack(buf, false)
+		str := string(buf)
+		msg := fmt.Sprintf("%s\n", str)
+		logger.Infof("GGM5 config FromContextOrDefaults pulling default config - stack trace:")
+		logger.Infoln(msg)
 	}
 
 	return &Config{

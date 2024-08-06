@@ -41,8 +41,8 @@ const (
 	// countWithReasonKey sets if the reason label should be included on count metrics
 	countWithReasonKey = "metrics.count.enable-reason"
 
-	// throttledWithNamespaceKey sets if the namespace label should be included on the taskrun throttled metrics
-	throttledWithNamespaceKey = "metrics.taskrun.throttle.enable-namespace"
+	// ThrottledWithNamespaceKey sets if the namespace label should be included on the taskrun throttled metrics
+	ThrottledWithNamespaceKey = "metrics.taskrun.throttle.enable-namespace"
 
 	// DefaultTaskrunLevel determines to what level to aggregate metrics
 	// when it isn't specified in configmap
@@ -157,9 +157,9 @@ func newMetricsFromMap(cfgMap map[string]string) (*Metrics, error) {
 		tc.CountWithReason = true
 	}
 
-	th, o := cfgMap[throttledWithNamespaceKey]
+	th, o := cfgMap[ThrottledWithNamespaceKey]
 	fmt.Fprintf(os.Stdout, "GGMGGM newMetricsFromMap key there %v value %s", o, th)
-	if throttleWithNamespace, ok := cfgMap[throttledWithNamespaceKey]; ok && throttleWithNamespace != "false" {
+	if throttleWithNamespace, ok := cfgMap[ThrottledWithNamespaceKey]; ok && throttleWithNamespace != "false" {
 		tc.ThrottleWithNamespace = true
 	}
 
